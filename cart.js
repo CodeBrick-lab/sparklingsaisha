@@ -444,13 +444,14 @@ async function proceedToPayment(){
   orders.push(orderData);
   saveOrders(orders);
   
-  // Send to backend immediately (pending status)
-  await sendOrderToBackend(orderData);
+  // Don't send pending orders to backend - only confirmed orders
   
   document.getElementById('checkout-modal').classList.add('hidden');
   
   if(isMobile()){
-    const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${total.toFixed(2)}&cu=INR`;
+    // Mobile: Add complete OrderID to UPI note
+    const upiNote = orderNumber;
+    const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${total.toFixed(2)}&tn=${encodeURIComponent(upiNote)}&cu=INR`;
     window.location.href = upiLink;
     setTimeout(() => { saveCart([]); updateCartCount(); renderCartItems(); }, 500);
   } else {
@@ -459,7 +460,9 @@ async function proceedToPayment(){
 }
 
 function showQRCodeModal(amount, orderNumber, items, customer, isResume=false){
-  const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${amount.toFixed(2)}&cu=INR`;
+  // Add complete OrderID to UPI note for reconciliation
+  const upiNote = orderNumber;
+  const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${amount.toFixed(2)}&tn=${encodeURIComponent(upiNote)}&cu=INR`;
   
   let modal = document.getElementById('qr-modal');
   if(!modal){
@@ -478,6 +481,7 @@ function showQRCodeModal(amount, orderNumber, items, customer, isResume=false){
       <div style="margin-top:16px;font-size:0.85rem;background:#f0f0f0;padding:8px;border-radius:6px">
         <p style="margin:0"><strong>Customer:</strong> ${customer.name}</p>
         <p style="margin:4px 0;font-size:0.8rem"><strong>Address:</strong> ${customer.street}${customer.apartment ? ', ' + customer.apartment : ''}, ${customer.city} ${customer.postalCode}</p>
+        <p style="margin:4px 0;font-size:0.75rem;color:#666"><strong>Transaction Note:</strong> ${upiNote}</p>
       </div>
       <button onclick="confirmPayment('${orderNumber}', '${customer.email}', ${amount}, ${isResume})">Paid? Confirm Order</button>
       <button onclick="document.getElementById('qr-modal').classList.add('hidden')" style="margin-left:8px">Cancel</button>
@@ -513,7 +517,7 @@ async function confirmPayment(orderNumber, email, amount, isResume=false){
     order.paidAt = new Date().toISOString();
     saveOrders(orders);
     
-    // Save confirmed order to backend
+    // Save only CONFIRMED order to backend (Orders.json)
     await saveOrderToBackend(order);
   }
   
@@ -541,7 +545,7 @@ async function sendOrderToBackend(orderData){
     });
     
     const result = await response.json();
-    console.log('Order saved to backend:', result);
+    console.log('Pending order created:', result);
     return response.ok;
   } catch(e){
     console.error('Order submission error:', e);
@@ -562,10 +566,10 @@ async function saveOrderToBackend(order){
     });
     
     const result = await response.json();
-    console.log('Order confirmed in backend:', result);
+    console.log('Confirmed order saved to Orders.json:', result);
     return response.ok;
   } catch(e){
-    console.error('Error saving order:', e);
+    console.error('Error saving confirmed order:', e);
     return false;
   }
 }

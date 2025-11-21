@@ -293,7 +293,12 @@ function renderOrdersPage(){
       
       <div style="background:#f0f0f0;padding:12px;border-radius:6px;font-size:0.85rem">
         <p style="margin:0;font-weight:600;margin-bottom:6px">Delivery Address:</p>
-        <p style="margin:0;color:var(--muted)">${order.customer.name}<br>${order.customer.address}<br>PIN: ${order.customer.pincode}</p>
+        <p style="margin:0;color:var(--muted)">
+          <strong>${order.customer.name}</strong><br>
+          ${order.customer.street}${order.customer.apartment ? ', ' + order.customer.apartment : ''}<br>
+          ${order.customer.city}, Maharashtra ${order.customer.postalCode}<br>
+          <strong>PIN:</strong> ${order.customer.postalCode}
+        </p>
       </div>
       ${actionBtn}
     `;

@@ -1,3 +1,38 @@
 {
-  "orders": []
+  "orders": [
+    {
+      "orderNumber": "ORD-1763720662967-JEH8S7A2Q",
+      "date": "2025-11-21T10:24:22.968Z",
+      "items": [
+        {
+          "id": "FRPRL182MLT",
+          "title": "Vintage Maharani Pearl Cluster Ring",
+          "price": 1,
+          "qty": 1
+        },
+        {
+          "id": "BRBRS201PST",
+          "title": "Heritage Rajwadi Bracelet - Antique Gold Matte Finish with Kundan work",
+          "price": 199,
+          "qty": 1
+        }
+      ],
+      "total": 200,
+      "status": "confirmed",
+      "customer": {
+        "name": "Ankush Anil Mukhedkar",
+        "email": "amuk8580@gmail.com",
+        "mobile": "+917744924954",
+        "street": "F2-502, Solacia Phase-II, Wagholi, Pune",
+        "apartment": "",
+        "city": "Pune",
+        "postalCode": "412207",
+        "state": "Maharashtra",
+        "country": "India",
+        "addressType": "Home"
+      },
+      "paidAt": "2025-11-21T10:24:26.202Z",
+      "confirmedAt": "2025-11-21T10:24:26.206Z"
+    }
+  ]
 }
