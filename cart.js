@@ -52,12 +52,16 @@ async function renderCartItems(){
     const p = products.find(pr=>pr.id==it.id);
     if(!p) continue;
     const price = parseFloat(p.price) || 0;
+    const thumb = (p.images && p.images.length>0 && p.images[0]!=='nan') ? p.images[0] : 'images/placeholder.png';
     const line = document.createElement('div');
     line.className = 'cart-line';
     line.innerHTML = `
       <div>
-        <strong>${p.title}</strong><br>
-        ${p.currency||'₹'}${price} x <input type="number" min="1" value="${it.qty}" data-id="${it.id}" style="width:60px;">
+        <img src="${thumb}" alt="${p.title}" class="cart-thumb" loading="lazy">
+        <div>
+          <strong>${p.title}</strong><br>
+          ${p.currency||'₹'}${price} x <input type="number" min="1" value="${it.qty}" data-id="${it.id}" style="width:60px;">
+        </div>
       </div>
       <div style="text-align:right">
         <div>${(price*it.qty).toFixed(2)}</div>
@@ -83,17 +87,57 @@ function updateCartCount(){
   if(el) el.textContent = c;
 }
 
-function toggleWishlist(id){
+function toggleWishlist(id, btnElement){
   const w = getWishlist();
   const exists = w.includes(id);
+  let message = '';
+  
   if(exists){
     const nw = w.filter(x=>x!=id);
     saveWishlist(nw);
+    message = 'Removed from wishlist';
   } else {
-    w.push(id); saveWishlist(w);
+    w.push(id);
+    saveWishlist(w);
+    message = 'Added to wishlist';
   }
+  
+  // Update all wishlist buttons with this id
+  updateWishlistButtons(id);
   renderWishlistCount();
   renderWishlist();
+  
+  // Show feedback message
+  showWishlistFeedback(message);
+}
+
+function updateWishlistButtons(id){
+  document.querySelectorAll(`.wishlist[data-id="${id}"]`).forEach(btn => {
+    const w = getWishlist();
+    if(w.includes(id)){
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function showWishlistFeedback(message){
+  // Remove existing feedback if present
+  const existing = document.getElementById('wishlist-feedback-msg');
+  if(existing) existing.remove();
+  
+  // Create feedback element
+  const feedback = document.createElement('div');
+  feedback.id = 'wishlist-feedback-msg';
+  feedback.className = 'wishlist-feedback';
+  feedback.textContent = message;
+  document.body.appendChild(feedback);
+  
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    feedback.remove();
+  }, 3000);
 }
 
 function renderWishlistCount(){
@@ -113,14 +157,21 @@ async function renderWishlist(){
   for(const id of w){
     const p = products.find(pr=>pr.id==id);
     if(!p) continue;
+    const thumb = (p.images && p.images.length>0 && p.images[0]!=='nan') ? p.images[0] : 'images/placeholder.png';
     const node = document.createElement('div');
     node.className = 'cart-line';
-    node.innerHTML = `<div><strong>${p.title}</strong><br>₹${p.price}</div>
+    node.innerHTML = `
+      <div>
+        <img src="${thumb}" alt="${p.title}" class="cart-thumb" loading="lazy">
+        <div>
+          <strong>${p.title}</strong><br>₹${p.price}
+        </div>
+      </div>
       <div><button class="add-to-cart" data-id="${p.id}">Add to cart</button> <button class="remove-w" data-id="${p.id}">Remove</button></div>`;
     container.appendChild(node);
   }
   container.querySelectorAll('.add-to-cart').forEach(btn=> btn.onclick = (e)=> addToCartById(e.currentTarget.dataset.id,1));
-  container.querySelectorAll('.remove-w').forEach(btn=> btn.onclick = (e)=> { const id=e.currentTarget.dataset.id; toggleWishlist(id); });
+  container.querySelectorAll('.remove-w').forEach(btn=> btn.onclick = (e)=> { const id=e.currentTarget.dataset.id; toggleWishlist(id, btn); });
 }
 
 function renderAccountArea(){
@@ -144,13 +195,150 @@ function renderAccountArea(){
   }
 }
 
-document.getElementById('checkout').onclick = ()=>{
-  // In real use, POST cart JSON to server or integrate with payment
+function isMobile(){
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+}
+
+function generateOrderNumber(){
+  return 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+}
+
+async function processCheckout(){
   const cart = getCart();
   if(cart.length==0){ alert('Cart is empty'); return; }
-  alert('Checkout placeholder — implement payment integration (serverless or payment gateway). Cart JSON available in localStorage.');
-  // example: localStorage.getItem(CART_KEY)
+  
+  const resp = await fetch('products.json').catch(()=>fetch('site_products_sample.json'));
+  const products = await resp.json();
+  
+  let total = 0;
+  const items = [];
+  for(const it of cart){
+    const p = products.find(pr=>pr.id==it.id);
+    if(!p) continue;
+    const price = parseFloat(p.price) || 0;
+    total += price * it.qty;
+    items.push({id: p.id, title: p.title, price: price, qty: it.qty});
+  }
+  
+  const orderNumber = generateOrderNumber();
+  const acc = getAccount();
+  
+  if(isMobile()){
+    // Mobile: Redirect to UPI
+    const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${total.toFixed(2)}&cu=INR`;
+    
+    // Send order details to backend
+    await sendOrderToBackend({orderNumber, items, total, email: acc.email || 'guest@example.com', status: 'pending'});
+    
+    // Redirect to UPI
+    window.location.href = upiLink;
+    
+    // Clear cart after a delay
+    setTimeout(() => { saveCart([]); updateCartCount(); renderCartItems(); }, 500);
+  } else {
+    // Desktop: Show QR code modal
+    showQRCodeModal(total, orderNumber, items, acc.email);
+  }
 }
+
+function showQRCodeModal(amount, orderNumber, items, email){
+  const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${amount.toFixed(2)}&cu=INR`;
+  
+  // Create modal
+  let modal = document.getElementById('qr-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'qr-modal';
+    modal.className = 'qr-modal';
+    document.body.appendChild(modal);
+  }
+  
+  modal.innerHTML = `
+    <div class="qr-content">
+      <h3>Scan to Pay</h3>
+      <p>Amount: <strong>₹${amount.toFixed(2)}</strong></p>
+      <canvas id="qr-canvas"></canvas>
+      <p style="font-size:0.9rem;color:#666">Order #${orderNumber}</p>
+      <button onclick="confirmPayment('${orderNumber}', '${email}', ${amount})">Paid? Confirm Order</button>
+      <button onclick="document.getElementById('qr-modal').classList.add('hidden')" style="margin-left:8px">Cancel</button>
+    </div>
+  `;
+  modal.classList.remove('hidden');
+  
+  // Generate QR code
+  setTimeout(() => generateQRCode(upiLink), 100);
+}
+
+function generateQRCode(text){
+  const canvas = document.getElementById('qr-canvas');
+  if(!canvas) return;
+  
+  // Simple QR code generation using qrcode.js library
+  if(typeof QRCode !== 'undefined'){
+    canvas.parentNode.innerHTML = '<div id="qr-container"></div>';
+    new QRCode(document.getElementById('qr-container'), {
+      text: text,
+      width: 200,
+      height: 200
+    });
+  } else {
+    // Fallback: show UPI link
+    canvas.style.display = 'none';
+    const link = document.createElement('p');
+    link.innerHTML = `<a href="${text}" target="_blank" style="color:var(--accent);text-decoration:underline">Open UPI Payment</a>`;
+    canvas.parentNode.appendChild(link);
+  }
+}
+
+async function confirmPayment(orderNumber, email, amount){
+  const cart = getCart();
+  const resp = await fetch('products.json').catch(()=>fetch('site_products_sample.json'));
+  const products = await resp.json();
+  
+  const items = [];
+  for(const it of cart){
+    const p = products.find(pr=>pr.id==it.id);
+    if(!p) continue;
+    const price = parseFloat(p.price) || 0;
+    items.push({id: p.id, title: p.title, price: price, qty: it.qty});
+  }
+  
+  // Send confirmed order to backend
+  const success = await sendOrderToBackend({
+    orderNumber, 
+    items, 
+    total: amount,
+    email: email || 'guest@example.com',
+    status: 'confirmed',
+    paidAt: new Date().toISOString()
+  });
+  
+  if(success){
+    alert('Order confirmed! Order # ' + orderNumber);
+    saveCart([]);
+    updateCartCount();
+    renderCartItems();
+    document.getElementById('qr-modal').classList.add('hidden');
+  }
+}
+
+async function sendOrderToBackend(orderData){
+  try {
+    // Replace with your actual backend endpoint
+    const response = await fetch('https://your-backend.com/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    }).catch(() => ({ok: true})); // Fallback for local testing
+    
+    return response.ok;
+  } catch(e){
+    console.error('Order submission error:', e);
+    return true; // Proceed anyway for demo
+  }
+}
+
+document.getElementById('checkout').onclick = () => processCheckout();
 
 // initial refresh
 renderCartItems();
@@ -158,3 +346,16 @@ updateCartCount();
 renderWishlistCount();
 renderWishlist();
 renderAccountArea();
+
+// Apply wishlist colors to initially loaded items
+setTimeout(() => {
+  const w = getWishlist();
+  w.forEach(id => updateWishlistButtons(id));
+}, 100);
+
+// Close other drawers when opening one
+function closeAllDrawers(){
+  document.getElementById('cart-drawer').classList.add('hidden');
+  document.getElementById('wishlist-drawer').classList.add('hidden');
+  document.getElementById('account-drawer').classList.add('hidden');
+}

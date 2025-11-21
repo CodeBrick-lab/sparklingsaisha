@@ -49,12 +49,14 @@ function render() {
   gallery.innerHTML = '';
   const start = (page-1)*PAGE_SIZE;
   const pageItems = filtered.slice(start, start+PAGE_SIZE);
+  const wishlist = getWishlist();
 
   for (const p of pageItems) {
     const img = (p.images && p.images.length>0) ? p.images[0] : 'images/placeholder.png';
     const mrp = p.mrp || 0;
     const price = p.price || 0;
     const discount = p.discount_pct || (mrp && price ? Math.round(((mrp-price)/mrp)*100) : 0);
+    const isWishlisted = wishlist.includes(p.id);
 
     const card = document.createElement('article');
     card.className = 'card';
@@ -70,7 +72,7 @@ function render() {
       <div class="actions">
         <button class="add-to-cart" data-id="${p.id}">Add to cart</button>
         <button class="btn-ghost view" data-id="${p.id}">Quick view</button>
-        <button class="btn-ghost wishlist" data-id="${p.id}">♡</button>
+        <button class="btn-ghost wishlist ${isWishlisted ? 'active' : ''}" data-id="${p.id}">♡</button>
       </div>
     `;
     gallery.appendChild(card);
@@ -95,8 +97,9 @@ function render() {
   });
   document.querySelectorAll('.wishlist').forEach(btn=>{
     btn.onclick = (e) => {
+      e.preventDefault();
       const id = e.currentTarget.dataset.id;
-      toggleWishlist(id);
+      toggleWishlist(id, e.currentTarget);
     };
   });
 
@@ -108,12 +111,13 @@ function openModalById(id) {
   if(!p) return;
   const img = (p.images && p.images.length>0) ? p.images[0] : 'images/placeholder.png';
   const galleryHtml = (p.images || []).map(u=>`<img class="modal-thumb" src="${u}" width="60" style="margin:6px;cursor:pointer">`).join('');
+  const isWishlisted = getWishlist().includes(p.id);
   document.getElementById('modal-img').src = img;
   document.getElementById('modal-caption').innerHTML = `<h3>${p.title}</h3><p>${p.description}</p>
   <div style="margin-top:8px"><strong>Price: ₹${p.price}</strong> <span style="text-decoration:line-through;color:#888;margin-left:8px">₹${p.mrp}</span> <span class="discount">${p.discount_pct}% OFF</span></div>
   <div style="margin-top:10px">Images: ${galleryHtml}</div>
   <div style="margin-top:10px"><a href="${p.whatsapp}" target="_blank">Chat on WhatsApp</a> • <a href="${p.upi}" target="_blank">Pay via UPI</a></div>
-  <div style="margin-top:14px"><button class="add-to-cart" data-id="${p.id}">Add to cart</button> <button class="btn-ghost wishlist" data-id="${p.id}">♡ Wishlist</button></div>
+  <div style="margin-top:14px"><button class="add-to-cart" data-id="${p.id}">Add to cart</button> <button class="btn-ghost wishlist ${isWishlisted ? 'active' : ''}" data-id="${p.id}">♡ Wishlist</button></div>
   `;
   document.getElementById('modal').classList.remove('hidden');
   // re-bind inside modal
@@ -125,7 +129,10 @@ function openModalById(id) {
       btn.onclick = (e) => { addToCartById(e.currentTarget.dataset.id,1); };
     });
     document.querySelectorAll('.wishlist').forEach(btn=>{
-      btn.onclick = (e) => { toggleWishlist(e.currentTarget.dataset.id); };
+      btn.onclick = (e) => { 
+        e.preventDefault();
+        toggleWishlist(e.currentTarget.dataset.id, e.currentTarget); 
+      };
     });
   },100);
 }
@@ -137,16 +144,34 @@ document.getElementById('search').oninput = debounce(applyFilters, 250);
 document.getElementById('category-filter').onchange = applyFilters;
 
 // cart UI toggles
-document.getElementById('open-cart').onclick = ()=> { document.getElementById('cart-drawer').classList.toggle('hidden'); renderCartItems(); };
+document.getElementById('open-cart').onclick = ()=> { 
+  closeAllDrawers();
+  document.getElementById('cart-drawer').classList.toggle('hidden'); 
+  renderCartItems(); 
+};
 document.getElementById('close-cart').onclick = ()=> document.getElementById('cart-drawer').classList.add('hidden');
 
 // wishlist toggles
-document.getElementById('open-wishlist').onclick = ()=> { document.getElementById('wishlist-drawer').classList.toggle('hidden'); renderWishlist(); };
+document.getElementById('open-wishlist').onclick = ()=> { 
+  closeAllDrawers();
+  document.getElementById('wishlist-drawer').classList.toggle('hidden'); 
+  renderWishlist(); 
+};
 document.getElementById('close-wishlist').onclick = ()=> document.getElementById('wishlist-drawer').classList.add('hidden');
 
 // account toggles
-document.getElementById('open-account').onclick = ()=> { document.getElementById('account-drawer').classList.toggle('hidden'); renderAccountArea(); };
+document.getElementById('open-account').onclick = ()=> { 
+  closeAllDrawers();
+  document.getElementById('account-drawer').classList.toggle('hidden'); 
+  renderAccountArea(); 
+};
 document.getElementById('close-account').onclick = ()=> document.getElementById('account-drawer').classList.add('hidden');
+
+function closeAllDrawers(){
+  document.getElementById('cart-drawer').classList.add('hidden');
+  document.getElementById('wishlist-drawer').classList.add('hidden');
+  document.getElementById('account-drawer').classList.add('hidden');
+}
 
 function debounce(fn, delay=200){
   let t;
