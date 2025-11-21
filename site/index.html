@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Static Shop</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="index.html"><img src="logo.svg" alt="Brand" class="logo"> <span>My Static Shop</span></a>
+    </div>
+    <div class="actions">
+      <input id="search" placeholder="Search products..." aria-label="Search products" />
+      <select id="category-filter"><option value="">All categories</option></select>
+      <button id="open-wishlist" title="Wishlist">♡ <span id="wishlist-count">0</span></button>
+      <button id="open-account" title="Account">👤</button>
+      <button id="open-cart">Cart (<span id="cart-count">0</span>)</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1 id="site-title">Featured Products</h1>
+      <p class="subtitle">Shop professional, mobile-first product pages.</p>
+    </section>
+
+    <section id="gallery" class="grid" aria-live="polite"></section>
+
+    <nav class="pagination">
+      <button id="prev-page">Prev</button>
+      <span id="page-info">Page 1</span>
+      <button id="next-page">Next</button>
+    </nav>
+  </main>
+
+  <!-- Image modal -->
+  <div id="modal" class="modal hidden" role="dialog" aria-hidden="true">
+    <div class="modal-content">
+      <button id="modal-close" class="btn-close">✕</button>
+      <div class="modal-body">
+        <img id="modal-img" src="" alt="" loading="lazy">
+        <div id="modal-caption"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cart drawer -->
+  <div id="cart-drawer" class="cart hidden" role="complementary" aria-hidden="true">
+    <button id="close-cart" class="btn-close">Close</button>
+    <h3>Your Cart</h3>
+    <div id="cart-items"></div>
+    <div class="cart-footer">
+      <strong>Total: <span id="cart-total">₹0</span></strong>
+      <button id="checkout">Checkout</button>
+    </div>
+  </div>
+
+  <!-- Wishlist drawer -->
+  <div id="wishlist-drawer" class="cart hidden" role="complementary" aria-hidden="true">
+    <button id="close-wishlist" class="btn-close">Close</button>
+    <h3>Your Wishlist</h3>
+    <div id="wishlist-items"></div>
+  </div>
+
+  <!-- Account drawer -->
+  <div id="account-drawer" class="cart hidden" role="complementary" aria-hidden="true">
+    <button id="close-account" class="btn-close">Close</button>
+    <h3>Account</h3>
+    <div id="account-area"></div>
+  </div>
+
+  <script src="cart.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
