@@ -2,6 +2,7 @@
 const CART_KEY = 'static_shop_cart_v1';
 const WISHLIST_KEY = 'static_shop_wishlist_v1';
 const ACCOUNT_KEY = 'static_shop_account_v1';
+const ORDERS_KEY = 'static_shop_orders_v1';
 
 function getCart(){ try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch(e){ return []; } }
 function saveCart(cart){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
@@ -9,6 +10,8 @@ function getWishlist(){ try { return JSON.parse(localStorage.getItem(WISHLIST_KE
 function saveWishlist(w){ localStorage.setItem(WISHLIST_KEY, JSON.stringify(w)); }
 function getAccount(){ try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || '{}'); } catch(e){ return {}; } }
 function saveAccount(a){ localStorage.setItem(ACCOUNT_KEY, JSON.stringify(a)); }
+function getOrders(){ try { return JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]'); } catch(e){ return []; } }
+function saveOrders(orders){ localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); }
 
 function addToCartById(id, qty=1){
   const cart = getCart();
@@ -207,6 +210,76 @@ async function processCheckout(){
   const cart = getCart();
   if(cart.length==0){ alert('Cart is empty'); return; }
   
+  const user = getAuthUser();
+  if(!user){
+    alert('Please login first');
+    document.getElementById('open-account').click();
+    return;
+  }
+  
+  showCheckoutModal(user);
+}
+
+function showCheckoutModal(user){
+  let modal = document.getElementById('checkout-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'checkout-modal';
+    modal.className = 'checkout-modal';
+    document.body.appendChild(modal);
+  }
+  
+  modal.innerHTML = `
+    <div class="checkout-content">
+      <h2>Checkout Details</h2>
+      <form id="checkout-form">
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="co-name" value="${user.name || ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" id="co-email" value="${user.email || ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Mobile Number *</label>
+          <input type="tel" id="co-mobile" value="${user.mobile || ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Complete Address *</label>
+          <textarea id="co-address" style="padding:10px;border:1px solid #e6e9ee;border-radius:6px;width:100%;min-height:80px" required>${user.address || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>PIN Code *</label>
+          <input type="text" id="co-pincode" value="${user.pincode || ''}" required>
+        </div>
+      </form>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="document.getElementById('checkout-modal').classList.add('hidden')">Cancel</button>
+        <button class="btn-primary" onclick="proceedToPayment()">Proceed to Payment</button>
+      </div>
+    </div>
+  `;
+  modal.classList.remove('hidden');
+}
+
+async function proceedToPayment(){
+  const name = document.getElementById('co-name').value.trim();
+  const email = document.getElementById('co-email').value.trim();
+  const mobile = document.getElementById('co-mobile').value.trim();
+  const address = document.getElementById('co-address').value.trim();
+  const pincode = document.getElementById('co-pincode').value.trim();
+  
+  if(!name || !email || !mobile || !address || !pincode){
+    alert('Please fill all fields');
+    return;
+  }
+  
+  // Save updated profile
+  const user = getAuthUser();
+  saveUserProfile({...user, name, email, mobile, address, pincode});
+  
+  const cart = getCart();
   const resp = await fetch('products.json').catch(()=>fetch('site_products_sample.json'));
   const products = await resp.json();
   
@@ -221,30 +294,34 @@ async function processCheckout(){
   }
   
   const orderNumber = generateOrderNumber();
-  const acc = getAccount();
+  
+  // Save order
+  const orders = getOrders();
+  orders.push({
+    orderNumber,
+    date: new Date().toISOString(),
+    items,
+    total,
+    status: 'pending',
+    customer: {name, email, mobile, address, pincode}
+  });
+  saveOrders(orders);
+  
+  document.getElementById('checkout-modal').classList.add('hidden');
   
   if(isMobile()){
-    // Mobile: Redirect to UPI
     const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${total.toFixed(2)}&cu=INR`;
-    
-    // Send order details to backend
-    await sendOrderToBackend({orderNumber, items, total, email: acc.email || 'guest@example.com', status: 'pending'});
-    
-    // Redirect to UPI
+    await sendOrderToBackend({orderNumber, items, total, customer: {name, email, mobile, address, pincode}, status: 'pending'});
     window.location.href = upiLink;
-    
-    // Clear cart after a delay
     setTimeout(() => { saveCart([]); updateCartCount(); renderCartItems(); }, 500);
   } else {
-    // Desktop: Show QR code modal
-    showQRCodeModal(total, orderNumber, items, acc.email);
+    showQRCodeModal(total, orderNumber, items, {name, email, mobile, address, pincode});
   }
 }
 
-function showQRCodeModal(amount, orderNumber, items, email){
+function showQRCodeModal(amount, orderNumber, items, customer, isResume=false){
   const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${amount.toFixed(2)}&cu=INR`;
   
-  // Create modal
   let modal = document.getElementById('qr-modal');
   if(!modal){
     modal = document.createElement('div');
@@ -257,84 +334,72 @@ function showQRCodeModal(amount, orderNumber, items, email){
     <div class="qr-content">
       <h3>Scan to Pay</h3>
       <p>Amount: <strong>₹${amount.toFixed(2)}</strong></p>
-      <canvas id="qr-canvas"></canvas>
       <p style="font-size:0.9rem;color:#666">Order #${orderNumber}</p>
-      <button onclick="confirmPayment('${orderNumber}', '${email}', ${amount})">Paid? Confirm Order</button>
+      <div id="qr-container"></div>
+      <div style="margin-top:16px;font-size:0.85rem;background:#f0f0f0;padding:8px;border-radius:6px">
+        <p style="margin:0"><strong>Customer:</strong> ${customer.name}</p>
+        <p style="margin:4px 0;font-size:0.8rem"><strong>Address:</strong> ${customer.address}, ${customer.pincode}</p>
+      </div>
+      <button onclick="confirmPayment('${orderNumber}', '${customer.email}', ${amount}, ${isResume})">Paid? Confirm Order</button>
       <button onclick="document.getElementById('qr-modal').classList.add('hidden')" style="margin-left:8px">Cancel</button>
     </div>
   `;
   modal.classList.remove('hidden');
   
-  // Generate QR code
   setTimeout(() => generateQRCode(upiLink), 100);
 }
 
 function generateQRCode(text){
-  const canvas = document.getElementById('qr-canvas');
-  if(!canvas) return;
+  const container = document.getElementById('qr-container');
+  if(!container) return;
   
-  // Simple QR code generation using qrcode.js library
   if(typeof QRCode !== 'undefined'){
-    canvas.parentNode.innerHTML = '<div id="qr-container"></div>';
-    new QRCode(document.getElementById('qr-container'), {
+    container.innerHTML = '';
+    new QRCode(container, {
       text: text,
       width: 200,
       height: 200
     });
   } else {
-    // Fallback: show UPI link
-    canvas.style.display = 'none';
-    const link = document.createElement('p');
-    link.innerHTML = `<a href="${text}" target="_blank" style="color:var(--accent);text-decoration:underline">Open UPI Payment</a>`;
-    canvas.parentNode.appendChild(link);
+    container.innerHTML = `<p><a href="${text}" target="_blank" style="color:var(--accent);text-decoration:underline">Open UPI Payment</a></p>`;
   }
 }
 
-async function confirmPayment(orderNumber, email, amount){
-  const cart = getCart();
-  const resp = await fetch('products.json').catch(()=>fetch('site_products_sample.json'));
-  const products = await resp.json();
+async function confirmPayment(orderNumber, email, amount, isResume=false){
+  const orders = getOrders();
+  const order = orders.find(o => o.orderNumber === orderNumber);
   
-  const items = [];
-  for(const it of cart){
-    const p = products.find(pr=>pr.id==it.id);
-    if(!p) continue;
-    const price = parseFloat(p.price) || 0;
-    items.push({id: p.id, title: p.title, price: price, qty: it.qty});
+  if(order){
+    order.status = 'confirmed';
+    order.paidAt = new Date().toISOString();
+    saveOrders(orders);
+    
+    await sendOrderToBackend({...order, status: 'confirmed'});
   }
   
-  // Send confirmed order to backend
-  const success = await sendOrderToBackend({
-    orderNumber, 
-    items, 
-    total: amount,
-    email: email || 'guest@example.com',
-    status: 'confirmed',
-    paidAt: new Date().toISOString()
-  });
+  alert('Order confirmed! Order # ' + orderNumber);
   
-  if(success){
-    alert('Order confirmed! Order # ' + orderNumber);
+  if(!isResume){
     saveCart([]);
     updateCartCount();
     renderCartItems();
-    document.getElementById('qr-modal').classList.add('hidden');
   }
+  
+  document.getElementById('qr-modal').classList.add('hidden');
 }
 
 async function sendOrderToBackend(orderData){
   try {
-    // Replace with your actual backend endpoint
     const response = await fetch('https://your-backend.com/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
-    }).catch(() => ({ok: true})); // Fallback for local testing
+    }).catch(() => ({ok: true}));
     
     return response.ok;
   } catch(e){
     console.error('Order submission error:', e);
-    return true; // Proceed anyway for demo
+    return true;
   }
 }
 
