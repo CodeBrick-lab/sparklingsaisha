@@ -3,6 +3,7 @@ const CART_KEY = 'static_shop_cart_v1';
 const WISHLIST_KEY = 'static_shop_wishlist_v1';
 const ACCOUNT_KEY = 'static_shop_account_v1';
 const ORDERS_KEY = 'static_shop_orders_v1';
+const ADDRESSES_KEY = 'static_shop_addresses_v1';
 
 function getCart(){ try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch(e){ return []; } }
 function saveCart(cart){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
@@ -12,6 +13,8 @@ function getAccount(){ try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY)
 function saveAccount(a){ localStorage.setItem(ACCOUNT_KEY, JSON.stringify(a)); }
 function getOrders(){ try { return JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]'); } catch(e){ return []; } }
 function saveOrders(orders){ localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); }
+function getAddresses(){ try { return JSON.parse(localStorage.getItem(ADDRESSES_KEY) || '[]'); } catch(e){ return []; } }
+function saveAddresses(addrs){ localStorage.setItem(ADDRESSES_KEY, JSON.stringify(addrs)); }
 
 function addToCartById(id, qty=1){
   const cart = getCart();
@@ -229,31 +232,108 @@ function showCheckoutModal(user){
     document.body.appendChild(modal);
   }
   
+  const addresses = getAddresses();
+  const defaultAddr = addresses.find(a => a.isDefault);
+  
+  let addressHTML = '';
+  if(addresses.length > 0){
+    addressHTML = `
+      <div class="address-section">
+        <h4>Select Saved Address</h4>
+        <div id="saved-addresses-list">
+          ${addresses.map((addr, idx) => `
+            <div class="address-item ${defaultAddr && defaultAddr.id === addr.id ? 'selected' : ''}" onclick="selectAddress(${idx})">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+                <div>
+                  <span class="address-badge">${addr.type}</span>
+                  ${addr.isDefault ? '<span class="default-badge">DEFAULT</span>' : ''}
+                </div>
+              </div>
+              <p style="margin:0;font-size:0.9rem">${addr.street}, ${addr.apartment ? addr.apartment + ', ' : ''}${addr.city}, ${addr.state} ${addr.postalCode}</p>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn-secondary" style="width:100%;margin-top:8px" onclick="toggleAddressForm()">+ Add New Address</button>
+      </div>
+    `;
+  }
+  
   modal.innerHTML = `
     <div class="checkout-content">
       <h2>Checkout Details</h2>
-      <form id="checkout-form">
+      <div id="address-section-container">${addressHTML}</div>
+      
+      <div id="new-address-form" style="display:${addresses.length > 0 ? 'none' : 'block'}">
+        <h4>Delivery Address</h4>
         <div class="form-group">
-          <label>Full Name *</label>
-          <input type="text" id="co-name" value="${user.name || ''}" required>
+          <label>Address Type *</label>
+          <select id="co-addr-type" required>
+            <option value="">Select Type</option>
+            <option value="Home">Home</option>
+            <option value="Office">Office</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Street Address *</label>
+            <input type="text" id="co-street" placeholder="123 Main Street" required>
+          </div>
+          <div class="form-group">
+            <label>Apartment/Suite (Optional)</label>
+            <input type="text" id="co-apartment" placeholder="Apt 4B">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>City/Locality *</label>
+            <input type="text" id="co-city" placeholder="Mumbai" required>
+          </div>
+          <div class="form-group">
+            <label>Postal Code *</label>
+            <input type="text" id="co-postal" placeholder="400001" required>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>State</label>
+            <input type="text" id="co-state" value="Maharashtra" disabled style="background:#f0f0f0">
+          </div>
+          <div class="form-group">
+            <label>Country</label>
+            <input type="text" id="co-country" value="India" disabled style="background:#f0f0f0">
+          </div>
+        </div>
+        
         <div class="form-group">
-          <label>Email *</label>
-          <input type="email" id="co-email" value="${user.email || ''}" required>
+          <label style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="co-set-default"> Set as default address
+          </label>
         </div>
+      </div>
+      
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e6e9ee">
+        <h4>Contact Details</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name *</label>
+            <input type="text" id="co-name" value="${user.name || ''}" required>
+          </div>
+          <div class="form-group">
+            <label>Email *</label>
+            <input type="email" id="co-email" value="${user.email || ''}" required>
+          </div>
+        </div>
+        
         <div class="form-group">
           <label>Mobile Number *</label>
           <input type="tel" id="co-mobile" value="${user.mobile || ''}" required>
         </div>
-        <div class="form-group">
-          <label>Complete Address *</label>
-          <textarea id="co-address" style="padding:10px;border:1px solid #e6e9ee;border-radius:6px;width:100%;min-height:80px" required>${user.address || ''}</textarea>
-        </div>
-        <div class="form-group">
-          <label>PIN Code *</label>
-          <input type="text" id="co-pincode" value="${user.pincode || ''}" required>
-        </div>
-      </form>
+      </div>
+      
       <div class="modal-footer">
         <button class="btn-secondary" onclick="document.getElementById('checkout-modal').classList.add('hidden')">Cancel</button>
         <button class="btn-primary" onclick="proceedToPayment()">Proceed to Payment</button>
@@ -261,23 +341,80 @@ function showCheckoutModal(user){
     </div>
   `;
   modal.classList.remove('hidden');
+  
+  // Set initial selected address
+  window.selectedAddressIndex = defaultAddr ? addresses.findIndex(a => a.id === defaultAddr.id) : -1;
+}
+
+function toggleAddressForm(){
+  const form = document.getElementById('new-address-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function selectAddress(idx){
+  window.selectedAddressIndex = idx;
+  document.querySelectorAll('.address-item').forEach((el, i) => {
+    el.classList.toggle('selected', i === idx);
+  });
 }
 
 async function proceedToPayment(){
   const name = document.getElementById('co-name').value.trim();
   const email = document.getElementById('co-email').value.trim();
   const mobile = document.getElementById('co-mobile').value.trim();
-  const address = document.getElementById('co-address').value.trim();
-  const pincode = document.getElementById('co-pincode').value.trim();
   
-  if(!name || !email || !mobile || !address || !pincode){
-    alert('Please fill all fields');
+  if(!name || !email || !mobile){
+    alert('Please fill contact details');
     return;
   }
   
-  // Save updated profile
+  let address, street, apartment, city, postalCode, addressType;
+  const addresses = getAddresses();
+  
+  if(window.selectedAddressIndex >= 0 && addresses[window.selectedAddressIndex]){
+    const addr = addresses[window.selectedAddressIndex];
+    street = addr.street;
+    apartment = addr.apartment;
+    city = addr.city;
+    postalCode = addr.postalCode;
+    address = `${street}${apartment ? ', ' + apartment : ''}, ${city}, Maharashtra ${postalCode}`;
+    addressType = addr.type;
+  } else {
+    street = document.getElementById('co-street').value.trim();
+    apartment = document.getElementById('co-apartment').value.trim();
+    city = document.getElementById('co-city').value.trim();
+    postalCode = document.getElementById('co-postal').value.trim();
+    addressType = document.getElementById('co-addr-type').value;
+    
+    if(!street || !city || !postalCode || !addressType){
+      alert('Please fill all address fields');
+      return;
+    }
+    
+    address = `${street}${apartment ? ', ' + apartment : ''}, ${city}, Maharashtra ${postalCode}`;
+    
+    const newAddr = {
+      id: 'addr-' + Date.now(),
+      type: addressType,
+      street,
+      apartment,
+      city,
+      state: 'Maharashtra',
+      postalCode,
+      country: 'India',
+      isDefault: document.getElementById('co-set-default').checked
+    };
+    
+    if(newAddr.isDefault){
+      addresses.forEach(a => a.isDefault = false);
+    }
+    
+    addresses.push(newAddr);
+    saveAddresses(addresses);
+  }
+  
   const user = getAuthUser();
-  saveUserProfile({...user, name, email, mobile, address, pincode});
+  saveUserProfile({...user, name, email, mobile, address, addressType});
   
   const cart = getCart();
   const resp = await fetch('products.json').catch(()=>fetch('site_products_sample.json'));
@@ -295,27 +432,29 @@ async function proceedToPayment(){
   
   const orderNumber = generateOrderNumber();
   
-  // Save order
   const orders = getOrders();
-  orders.push({
+  const orderData = {
     orderNumber,
     date: new Date().toISOString(),
     items,
     total,
     status: 'pending',
-    customer: {name, email, mobile, address, pincode}
-  });
+    customer: {name, email, mobile, street, apartment, city, postalCode, state: 'Maharashtra', country: 'India', addressType}
+  };
+  orders.push(orderData);
   saveOrders(orders);
+  
+  // Send to backend immediately (pending status)
+  await sendOrderToBackend(orderData);
   
   document.getElementById('checkout-modal').classList.add('hidden');
   
   if(isMobile()){
     const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${total.toFixed(2)}&cu=INR`;
-    await sendOrderToBackend({orderNumber, items, total, customer: {name, email, mobile, address, pincode}, status: 'pending'});
     window.location.href = upiLink;
     setTimeout(() => { saveCart([]); updateCartCount(); renderCartItems(); }, 500);
   } else {
-    showQRCodeModal(total, orderNumber, items, {name, email, mobile, address, pincode});
+    showQRCodeModal(total, orderNumber, items, {name, email, mobile, street, apartment, city, postalCode, addressType});
   }
 }
 
@@ -338,7 +477,7 @@ function showQRCodeModal(amount, orderNumber, items, customer, isResume=false){
       <div id="qr-container"></div>
       <div style="margin-top:16px;font-size:0.85rem;background:#f0f0f0;padding:8px;border-radius:6px">
         <p style="margin:0"><strong>Customer:</strong> ${customer.name}</p>
-        <p style="margin:4px 0;font-size:0.8rem"><strong>Address:</strong> ${customer.address}, ${customer.pincode}</p>
+        <p style="margin:4px 0;font-size:0.8rem"><strong>Address:</strong> ${customer.street}${customer.apartment ? ', ' + customer.apartment : ''}, ${customer.city} ${customer.postalCode}</p>
       </div>
       <button onclick="confirmPayment('${orderNumber}', '${customer.email}', ${amount}, ${isResume})">Paid? Confirm Order</button>
       <button onclick="document.getElementById('qr-modal').classList.add('hidden')" style="margin-left:8px">Cancel</button>
@@ -374,7 +513,8 @@ async function confirmPayment(orderNumber, email, amount, isResume=false){
     order.paidAt = new Date().toISOString();
     saveOrders(orders);
     
-    await sendOrderToBackend({...order, status: 'confirmed'});
+    // Save confirmed order to backend
+    await saveOrderToBackend(order);
   }
   
   alert('Order confirmed! Order # ' + orderNumber);
@@ -390,16 +530,43 @@ async function confirmPayment(orderNumber, email, amount, isResume=false){
 
 async function sendOrderToBackend(orderData){
   try {
-    const response = await fetch('https://your-backend.com/api/orders', {
+    const apiUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:3000/api/orders'
+      : '/api/orders';
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
-    }).catch(() => ({ok: true}));
+    });
     
+    const result = await response.json();
+    console.log('Order saved to backend:', result);
     return response.ok;
   } catch(e){
     console.error('Order submission error:', e);
-    return true;
+    return false;
+  }
+}
+
+async function saveOrderToBackend(order){
+  try {
+    const apiUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:3000/api/save-order'
+      : '/api/save-order';
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order)
+    });
+    
+    const result = await response.json();
+    console.log('Order confirmed in backend:', result);
+    return response.ok;
+  } catch(e){
+    console.error('Error saving order:', e);
+    return false;
   }
 }
 

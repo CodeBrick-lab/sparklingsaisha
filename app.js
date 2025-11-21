@@ -507,15 +507,39 @@ function logoutAccount(){
   renderAccountPage();
 }
 
+async function loadMarqueeMessages() {
+  try {
+    const resp = await fetch('Marquee.json');
+    if(!resp.ok) throw new Error('Failed to load Marquee.json');
+    const data = await resp.json();
+    const marqueeContent = document.getElementById('marquee-content');
+    if(marqueeContent && data.messages && data.messages.length > 0){
+      marqueeContent.innerHTML = data.messages
+        .map(msg => `<div class="marquee-item">${msg}</div>`)
+        .join('');
+      // Duplicate messages for seamless loop
+      const items = marqueeContent.innerHTML;
+      marqueeContent.innerHTML = items + items;
+    }
+  } catch(e){
+    console.warn('Marquee loading skipped:', e);
+  }
+}
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM ready, loading products...');
+  console.log('DOM ready, loading products and marquee...');
+  loadMarqueeMessages();
   loadProducts();
 });
 
 // Fallback if DOMContentLoaded already fired
 if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', loadProducts);
+  document.addEventListener('DOMContentLoaded', () => {
+    loadMarqueeMessages();
+    loadProducts();
+  });
 } else {
+  loadMarqueeMessages();
   loadProducts();
 }
