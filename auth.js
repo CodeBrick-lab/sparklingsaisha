@@ -19,7 +19,7 @@ async function requestOTPViaWhatsApp(mobile){
   
   // For testing/demo, show OTP in console and alert
   console.log('WhatsApp OTP for', mobile, ':', otp);
-  alert(`WhatsApp OTP sent to ${mobile}\n\nTest OTP: ${otp}\n\n(In production, check your WhatsApp)`);
+  alert(`WhatsApp OTP sent to ${mobile}\n\nOTP: ${otp}\n\n(In production, check your WhatsApp)`);
   return true;
 }
 
