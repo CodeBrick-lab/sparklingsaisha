@@ -451,7 +451,7 @@ async function proceedToPayment(){
   if(isMobile()){
     // Mobile: Add complete OrderID to UPI note
     const upiNote = orderNumber;
-    const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${total.toFixed(2)}&tn=${encodeURIComponent(upiNote)}&cu=INR`;
+    const upiLink = `upi://pay?pa=shraddha.mukhedkar3@okaxis&pn=Saisha&am=${total.toFixed(2)}&tn=${encodeURIComponent(upiNote)}&cu=INR`;
     window.location.href = upiLink;
     setTimeout(() => { saveCart([]); updateCartCount(); renderCartItems(); }, 500);
   } else {
@@ -462,7 +462,7 @@ async function proceedToPayment(){
 function showQRCodeModal(amount, orderNumber, items, customer, isResume=false){
   // Add complete OrderID to UPI note for reconciliation
   const upiNote = orderNumber;
-  const upiLink = `upi://pay?pa=amuk8580-3@okaxis&pn=Ankush Mukhedkar&am=${amount.toFixed(2)}&tn=${encodeURIComponent(upiNote)}&cu=INR`;
+  const upiLink = `upi://pay?pa=shraddha.mukhedkar3@okaxis&pn=Saisha&am=${amount.toFixed(2)}&tn=${encodeURIComponent(upiNote)}&cu=INR`;
   
   let modal = document.getElementById('qr-modal');
   if(!modal){
